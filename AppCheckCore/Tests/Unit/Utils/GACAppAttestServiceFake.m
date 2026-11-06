@@ -27,6 +27,7 @@
 }
 
 @synthesize supported = _supported;
+
 @synthesize generateKeyCallCount = _generateKeyCallCount;
 @synthesize keyIdToReturn = _keyIdToReturn;
 @synthesize generateKeyErrorToReturn = _generateKeyErrorToReturn;
@@ -82,6 +83,7 @@
 }
 
 - (BOOL)isSupported {
+  if (self.supportQueryException) { @throw self.supportQueryException; }
   @synchronized(self) {
     return _supported;
   }

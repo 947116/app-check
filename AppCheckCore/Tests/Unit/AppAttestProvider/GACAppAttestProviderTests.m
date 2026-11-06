@@ -42,6 +42,7 @@
 
 GAC_APP_ATTEST_PROVIDER_AVAILABILITY
 @interface GACAppAttestProvider (Tests)
+- (FBLPromise<NSNull *> *)isAppAttestSupported;
 - (instancetype)initWithAppAttestService:(id<GACAppAttestService>)appAttestService
                               APIService:(id<GACAppAttestAPIServiceProtocol>)APIService
                             keyIDStorage:(id<GACAppAttestKeyIDStorageProtocol>)keyIDStorage
@@ -81,6 +82,37 @@ GAC_APP_ATTEST_PROVIDER_AVAILABILITY
 @end
 
 @implementation GACAppAttestProviderTests
+
+- (void)testSupportQueryConvertsKnownDeviceCheckXPCFailureToRejectedPromise {
+  self.fakeAppAttestService.supportQueryException = [NSException
+      exceptionWithName:NSInvalidArgumentException
+                 reason:@"-[_NSXPCConnectionExpectedReplies appAttestType]: unrecognized selector sent to instance 0x1234"
+               userInfo:nil];
+  FBLPromise<NSNull *> *promise = [self.provider isAppAttestSupported];
+  XCTAssertTrue(promise.isRejected);
+  XCTAssertNil(promise.value);
+  XCTAssertNotNil(promise.error);
+  XCTAssertEqualObjects(promise.error.domain, GACAppCheckErrorDomain);
+  XCTAssertEqual(self.fakeAppAttestService.generateKeyCallCount, 0);
+  XCTAssertEqual(self.fakeAppAttestService.attestKeyCallCount, 0);
+  XCTAssertEqual(self.fakeAppAttestService.generateAssertionCallCount, 0);
+}
+
+- (void)testSupportQueryDoesNotMaskOtherInvalidArguments {
+  self.fakeAppAttestService.supportQueryException =
+      [NSException exceptionWithName:NSInvalidArgumentException reason:@"unrelated bug" userInfo:nil];
+  XCTAssertThrowsSpecificNamed([self.provider isAppAttestSupported], NSException,
+                              NSInvalidArgumentException);
+}
+
+- (void)testSupportQueryDoesNotMaskAnotherExceptionWithMatchingMessage {
+  self.fakeAppAttestService.supportQueryException = [NSException
+      exceptionWithName:NSInternalInconsistencyException
+                 reason:@"-[_NSXPCConnectionExpectedReplies appAttestType]: unrecognized selector"
+               userInfo:nil];
+  XCTAssertThrowsSpecificNamed([self.provider isAppAttestSupported], NSException,
+                              NSInternalInconsistencyException);
+}
 
 - (void)setUp {
   [super setUp];

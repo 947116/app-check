@@ -22,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface GACAppAttestServiceFake : NSObject <GACAppAttestService>
 
 @property(nonatomic, assign, getter=isSupported) BOOL supported;
+@property(nonatomic, nullable) NSException *supportQueryException;
 
 @property(nonatomic) NSInteger generateKeyCallCount;
 @property(nonatomic, copy, nullable) NSString *keyIdToReturn;

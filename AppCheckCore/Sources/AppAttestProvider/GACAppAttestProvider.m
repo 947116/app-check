@@ -571,7 +571,24 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Returns a resolved promise if App Attest is supported and a rejected promise if it is not.
 - (FBLPromise<NSNull *> *)isAppAttestSupported {
-  if (self.appAttestService.isSupported) {
+  BOOL supported;
+  @try {
+    supported = self.appAttestService.isSupported;
+  } @catch (NSException *exception) {
+    // DeviceCheck on iOS 27.0.1 can send appAttestType to its own XPC
+    // reply bookkeeping object. Treat this exact OS service failure like a
+    // failed attestation, never as a valid token or a successful handshake.
+    if (![exception.name isEqualToString:NSInvalidArgumentException] ||
+        ![exception.reason hasPrefix:@"-[_NSXPCConnectionExpectedReplies appAttestType]: unrecognized selector"]) {
+      @throw;
+    }
+    NSError *error = [_GACAppCheckErrorUtil errorWithFailureReason:
+        @"App Attest support query failed in the DeviceCheck service."];
+    FBLPromise *rejectedPromise = [FBLPromise pendingPromise];
+    [rejectedPromise reject:error];
+    return rejectedPromise;
+  }
+  if (supported) {
     return [FBLPromise resolvedWith:[NSNull null]];
   } else {
     NSError *error = [_GACAppCheckErrorUtil unsupportedAttestationProvider:@"AppAttestProvider"];
